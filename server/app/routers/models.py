@@ -19,16 +19,14 @@ AVAILABLE_MODELS: List[ModelInfo] = [
     ModelInfo(id="claude-haiku-4-5", name="Claude 4.5 Haiku", provider="Anthropic", description="Fast lightweight Anthropic model"),
     ModelInfo(id="claude-fable-5", name="Claude 5 Fable", provider="Anthropic", description="Creative & story generation specialist"),
 
-    # Gemini Family
-    ModelInfo(id="gemini-2-5-pro", name="Gemini 2.5 Pro", provider="Google", description="Deep context window & multimodal reasoning"),
-    ModelInfo(id="gemini-2-5-flash", name="Gemini 2.5 Flash", provider="Google", description="Ultra-fast lightweight Google model"),
-    ModelInfo(id="gemini-3-flash", name="Gemini 3 Flash", provider="Google", description="Next-gen Gemini 3 high-efficiency model"),
-    ModelInfo(id="gemini-3-5-flash", name="Gemini 3.5 Flash", provider="Google", description="Enhanced speed & accuracy Gemini tier"),
-    ModelInfo(id="gemini-3-5-flash-openai", name="Gemini 3.5 Flash (OpenAI Format)", provider="Google", description="Gemini 3.5 Flash with OpenAI schema compatibility"),
-    ModelInfo(id="gemini-3-6-flash", name="Gemini 3.6 Flash", provider="Google", description="Latest 3.6 Flash iteration"),
-    ModelInfo(id="gemini-3-6-flash-openai", name="Gemini 3.6 Flash (OpenAI Format)", provider="Google", description="Gemini 3.6 Flash OpenAI format"),
-    ModelInfo(id="gemini-3-1-pro", name="Gemini 3.1 Pro", provider="Google", description="Pro-grade reasoning & structured output engine"),
-    ModelInfo(id="gemini-3-pro", name="Gemini 3 Pro", provider="Google", description="Flagship Gemini 3 reasoning engine"),
+    # Gemini Family — official Generative Language API model codes
+    ModelInfo(id="gemini-3.8-flash", name="Gemini 3.8 Flash", provider="Google", description="Current Gemini Flash model", recommended=True),
+    ModelInfo(id="gemini-3.6-flash", name="Gemini 3.6 Flash", provider="Google", description="Fast Gemini 3.6 model"),
+    ModelInfo(id="gemini-3.5-flash", name="Gemini 3.5 Flash", provider="Google", description="Stable Gemini 3.5 Flash model"),
+    ModelInfo(id="gemini-3.5-flash-lite", name="Gemini 3.5 Flash-Lite", provider="Google", description="Lower-cost Gemini 3.5 model"),
+    ModelInfo(id="gemini-3.1-pro-preview", name="Gemini 3.1 Pro", provider="Google", description="Gemini 3.1 Pro preview"),
+    ModelInfo(id="gemini-2.5-flash", name="Gemini 2.5 Flash", provider="Google", description="Gemini 2.5 Flash"),
+    ModelInfo(id="gemini-2.5-pro", name="Gemini 2.5 Pro", provider="Google", description="Gemini 2.5 Pro"),
 
     # GPT Family
     ModelInfo(id="gpt-5-mini", name="GPT 5 Mini", provider="OpenAI", description="Compact high-speed GPT-5 model", recommended=True),

@@ -1,9 +1,12 @@
 import json
 import asyncio
+import re
 import httpx
 from typing import AsyncGenerator, Dict, Any, List
 from app.config import settings
 from app.services.storage_service import storage_service
+
+_GEMINI_MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 class ModelProviderService:
     def __init__(self):
@@ -39,10 +42,17 @@ class ModelProviderService:
             yield {"type": "turn.completed", "ok": False}
             return
 
-        if app_settings.get("model_api_wire_api") == "responses":
+        extra_headers = app_settings.get("model_api_headers") or {}
+        wire_api = app_settings.get("model_api_wire_api")
+        if wire_api == "responses":
             async for event in self._stream_responses(
-                base_url, api_key, model, messages, system_prompt,
-                app_settings.get("model_api_headers") or {},
+                base_url, api_key, model, messages, system_prompt, extra_headers,
+            ):
+                yield event
+            return
+        if wire_api == "gemini":
+            async for event in self._stream_gemini(
+                base_url, api_key, model, messages, system_prompt, extra_headers,
             ):
                 yield event
             return
@@ -255,6 +265,106 @@ class ModelProviderService:
                     raise RuntimeError("Responses stream ended before completion.")
         except (httpx.HTTPError, ValueError, RuntimeError) as exc:
             # Do not expose upstream bodies, request headers, or credentials.
+            detail = str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__
+            yield {"type": "content.delta", "delta": f"Inference request failed: {detail}"}
+            yield {"type": "turn.completed", "ok": False}
+
+    async def _stream_gemini(self, base_url, api_key, model, messages, system_prompt, extra_headers):
+        model_id = (model or "").strip()
+        if not _GEMINI_MODEL_ID.fullmatch(model_id):
+            yield {"type": "content.delta", "delta": "Enter an official Gemini model ID, such as gemini-3.5-flash."}
+            yield {"type": "turn.completed", "ok": False}
+            return
+
+        contents = []
+        for message in messages:
+            role = "model" if message.get("role") == "assistant" else "user"
+            parts = []
+            text = message.get("content") or ""
+            if text:
+                parts.append({"text": text})
+            image_url = message.get("image_url") or ""
+            if role == "user" and image_url.startswith("data:") and ";base64," in image_url:
+                header, data = image_url.split(";base64,", 1)
+                mime_type = header[5:] or "image/png"
+                if mime_type.startswith("image/"):
+                    parts.append({"inline_data": {"mime_type": mime_type, "data": data}})
+            if not parts:
+                continue
+            if contents and contents[-1]["role"] == role:
+                contents[-1]["parts"].extend(parts)
+            else:
+                contents.append({"role": role, "parts": parts})
+        while contents and contents[0]["role"] != "user":
+            contents.pop(0)
+        if not contents:
+            yield {"type": "content.delta", "delta": "Gemini needs a user message before it can respond."}
+            yield {"type": "turn.completed", "ok": False}
+            return
+
+        body = {"contents": contents}
+        if system_prompt and system_prompt.strip():
+            body["systemInstruction"] = {"parts": [{"text": system_prompt.strip()}]}
+        headers = {
+            **extra_headers,
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+            "x-goog-api-key": api_key,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{base_url}/models/{model_id}:streamGenerateContent",
+                    params={"alt": "sse"},
+                    json=body,
+                    headers=headers,
+                ) as response:
+                    if not response.is_success:
+                        raise RuntimeError(f"Gemini API returned HTTP {response.status_code}.")
+                    saw_text = False
+                    completed = False
+                    data_lines = []
+
+                    async def consume(payload):
+                        nonlocal saw_text, completed
+                        if payload == "[DONE]":
+                            completed = True
+                            return
+                        event = json.loads(payload)
+                        if event.get("error") or (event.get("promptFeedback") or {}).get("blockReason"):
+                            raise RuntimeError("Gemini API rejected the request.")
+                        for candidate in event.get("candidates") or []:
+                            for part in (candidate.get("content") or {}).get("parts") or []:
+                                if part.get("thought"):
+                                    continue
+                                text_part = part.get("text") or ""
+                                if text_part:
+                                    saw_text = True
+                                    yield {"type": "content.delta", "delta": text_part}
+                            reason = candidate.get("finishReason")
+                            if reason in {"STOP", "MAX_TOKENS"}:
+                                completed = True
+                            elif reason:
+                                raise RuntimeError(f"Gemini API ended with {reason}.")
+
+                    async for line in response.aiter_lines():
+                        if line.startswith("data:"):
+                            data_lines.append(line[5:].lstrip())
+                            continue
+                        if line or not data_lines:
+                            continue
+                        async for event in consume("\n".join(data_lines)):
+                            yield event
+                        data_lines = []
+                    if data_lines:
+                        async for event in consume("\n".join(data_lines)):
+                            yield event
+                    if completed or saw_text:
+                        yield {"type": "turn.completed", "ok": True}
+                        return
+                    raise RuntimeError("Gemini stream ended before completion.")
+        except (httpx.HTTPError, ValueError, RuntimeError) as exc:
             detail = str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__
             yield {"type": "content.delta", "delta": f"Inference request failed: {detail}"}
             yield {"type": "turn.completed", "ok": False}

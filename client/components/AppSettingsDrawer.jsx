@@ -4,6 +4,17 @@ import React, { useState, useEffect } from "react";
 import { FiX, FiEye, FiEyeOff, FiPlus, FiTrash2, FiChevronDown } from "react-icons/fi";
 import { fetchSettings, saveSettings } from "../lib/api";
 
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const GEMINI_MODELS = [
+  "gemini-3.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-pro-preview",
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+];
+
 const inputClass = "w-full bg-[#222226] border border-[#36363d] rounded-lg px-3 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-violet-400";
 const cardClass = "bg-[#18181b] border border-[#27272a] rounded-2xl p-4 space-y-4";
 const buttonClass = "rounded-lg px-3 py-2 text-xs font-medium bg-violet-500 text-white hover:bg-violet-400 disabled:opacity-50 disabled:cursor-not-allowed";
@@ -143,7 +154,7 @@ export default function AppSettingsDrawer({ models, isOpen, onClose, currentMode
               <FiChevronDown aria-hidden="true" className="text-zinc-400 transition-transform group-open:rotate-180" />
             </span>
             <span className="block text-xs text-zinc-400 mt-1 break-words">
-              {loaded ? `${wireApi === "responses" ? "Responses API" : "Prediction API"} · ${defaultModel}` : "Configure API endpoint, credentials and models"}
+              {loaded ? `${wireApi === "responses" ? "Responses API" : wireApi === "gemini" ? "Gemini API" : "Prediction API"} · ${defaultModel}` : "Configure API endpoint, credentials and models"}
             </span>
             <span className="block text-[11px] text-violet-300 mt-2">Click to configure</span>
           </summary>
@@ -153,16 +164,25 @@ export default function AppSettingsDrawer({ models, isOpen, onClose, currentMode
           <fieldset disabled={!loaded || saving} className="space-y-4 disabled:opacity-60">
             <div className="space-y-1.5">
               <label htmlFor="provider-url" className="block text-xs font-medium">API Base URL</label>
-              <input id="provider-url" type="url" required value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://your-provider.example/v1" className={inputClass} />
-              <p className="text-[11px] text-zinc-500">Enter the API root, usually ending in /v1. Do not append /responses.</p>
+              <input id="provider-url" type="url" required value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={wireApi === "gemini" ? GEMINI_BASE_URL : "https://your-provider.example/v1"} className={inputClass} />
+              <p className="text-[11px] text-zinc-500">{wireApi === "gemini" ? "Use the Gemini API root ending in /v1beta. Do not append a model name." : "Enter the API root, usually ending in /v1. Do not append /responses."}</p>
             </div>
             <div className="space-y-1.5">
               <label htmlFor="provider-protocol" className="block text-xs font-medium">API protocol</label>
-              <select id="provider-protocol" value={wireApi} onChange={(e) => setWireApi(e.target.value)} className={inputClass}>
+              <select id="provider-protocol" value={wireApi} onChange={(e) => {
+                const next = e.target.value;
+                setWireApi(next);
+                if (next === "gemini") {
+                  setBaseUrl(GEMINI_BASE_URL);
+                  setModelIds(GEMINI_MODELS.join("\n"));
+                  setDefaultModel(GEMINI_MODELS[0]);
+                }
+              }} className={inputClass}>
+                <option value="gemini">Gemini API (Google)</option>
                 <option value="responses">Responses API</option>
                 <option value="prediction">Prediction API (original adapter)</option>
               </select>
-              <p className="text-[11px] text-zinc-500">{wireApi === "responses" ? "Uses /responses with Bearer authentication. Chat Completions is not supported yet." : "Uses /{model_id} and prediction polling with x-api-key authentication."}</p>
+              <p className="text-[11px] text-zinc-500">{wireApi === "gemini" ? "Streams from Google's Generative Language API with an AI Studio API key. Use official model IDs such as gemini-3.5-flash." : wireApi === "responses" ? "Uses /responses with Bearer authentication. Chat Completions is not supported yet." : "Uses /{model_id} and prediction polling with x-api-key authentication."}</p>
             </div>
             <div className="space-y-1.5">
               <label htmlFor="provider-key" className="block text-xs font-medium">Inference API Key</label>

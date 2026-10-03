@@ -81,7 +81,7 @@ class ModelInfo(BaseModel):
 class AppSettingsSchema(BaseModel):
     model_api_key: str = Field(default="", json_schema_extra={"writeOnly": True})
     model_api_base_url: str = ""
-    model_api_wire_api: Literal["prediction", "responses"] = "prediction"
+    model_api_wire_api: Literal["prediction", "responses", "gemini"] = "prediction"
     model_api_headers: Dict[str, str] = Field(default_factory=dict, json_schema_extra={"writeOnly": True})
     model_api_headers_configured: bool = False
     clear_model_api_headers: bool = Field(default=False, json_schema_extra={"writeOnly": True})
