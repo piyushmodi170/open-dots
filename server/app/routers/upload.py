@@ -38,7 +38,7 @@ async def upload_image_file(file: UploadFile = File(...)):
     base_url = (app_settings.get("model_api_base_url") or settings.MODEL_API_BASE_URL).rstrip("/")
 
     # Use the configured endpoint for hosted images when credentials are available.
-    if app_settings.get("model_api_wire_api") != "responses" and api_key and not api_key.startswith("mock_"):
+    if app_settings.get("model_api_wire_api") == "prediction" and api_key and not api_key.startswith("mock_"):
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 files_payload = {"file": (filename or "image.png", file_bytes, content_type or "image/png")}
